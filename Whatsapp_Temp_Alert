@@ -1,0 +1,89 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <UrlEncode.h>
+#include "time.h"
+#include <Wire.h>
+#include <WiFiManager.h>
+#include <DHT.h>
+
+#define TEMPERATURE_ALERT_HIGH 27
+#define TEMPERATURE_ALERT_LOW  25
+
+#define DHTPIN 26    // Pin connected to the DHT22 sensor
+#define DHTTYPE DHT22   // DHT 22 (AM2302) sensor type
+
+DHT dht(DHTPIN, DHTTYPE);   // Initialize the DHT sensor
+
+String phoneNumber = "+917979939713";
+String apiKey = "9376948"; // Replace this with your CallMeBot API key
+
+void sendMessage(String message) {
+  // Data to send with HTTP POST
+  String url = "https://api.callmebot.com/whatsapp.php?phone=" + phoneNumber + "&apikey=" + apiKey + "&text=" + urlEncode(message);
+  HTTPClient http;
+  http.begin(url);
+
+  // Specify content-type header
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+  // Send HTTP POST request
+  int httpResponseCode = http.POST(url);
+  if (httpResponseCode == 200) {
+    Serial.print("Message sent successfully");
+  } else {
+    Serial.println("Error sending the message");
+    Serial.print("HTTP response code: ");
+    Serial.println(httpResponseCode);
+  }
+
+  // Free resources
+  http.end();
+}
+
+void setup() {
+  Serial.begin(115200);
+  dht.begin();   // Initialize the DHT sensor
+
+  WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+
+  // WiFiManager, Local initialization. Once its business is done, there is no need to keep it around
+  WiFiManager wm;
+
+  // Automatically connect using saved credentials,
+  // if connection fails, it starts an access point with the specified name ("Dart Frog"),
+  // then goes into a blocking loop awaiting configuration and will return a success result
+
+  bool res;
+  res = wm.autoConnect("Dart Frog");
+
+  if (!res) {
+    Serial.println("Failed to connect");
+  } else {
+    Serial.println("Connected to WiFi!");
+  }
+  
+  // Your custom code here (if needed) after successful WiFi connection
+  
+}
+
+void loop() {
+  // Read DHT22 sensor data
+  float humidity = dht.readHumidity();
+  float temperature = dht.readTemperature();
+  
+  // Send Message to WhatsApp with DHT22 data
+  String message = "Dart Frog \n";
+  message += "Temperature: " + String(temperature) + " °C\n";
+  message += "Humidity: " + String(humidity) + " %";
+
+  // Check for temperature alerts
+  if (temperature > TEMPERATURE_ALERT_HIGH) {
+    sendMessage(message);
+    delay(1000); // Wait for 1 second to avoid repeated alerts
+  } else if (temperature < TEMPERATURE_ALERT_LOW) {
+    sendMessage(message);
+    delay(1000); // Wait for 1 second to avoid repeated alerts
+  }
+  
+  delay(2000); // Adjust this delay based on your desired monitoring frequency (in milliseconds)
+}
